@@ -83,7 +83,7 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950">
+    <div className="min-h-full bg-neutral-50 dark:bg-neutral-950">
       <div className="max-w-2xl mx-auto px-8 py-12">
         {/* Header */}
         <div className="mb-12">
