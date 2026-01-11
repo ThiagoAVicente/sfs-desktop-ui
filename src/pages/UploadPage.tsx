@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { api } from '../lib/api';
+import { Store } from '@tauri-apps/plugin-store';
 
 type FileStatus = 'pending' | 'uploading' | 'indexing' | 'complete' | 'error';
 
 interface UploadJob {
   id: string;
-  file: File;
+  filePath: string;
   fileName: string;
   status: FileStatus;
   jobId?: string;
@@ -13,9 +14,59 @@ interface UploadJob {
   progress: number;
 }
 
+const QUEUE_STORE_KEY = 'upload-queue';
+
 export function UploadPage() {
   const [queue, setQueue] = useState<UploadJob[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [store, setStore] = useState<Store | null>(null);
+  const [updateMode, setUpdateMode] = useState(false);
+  const hasResumedPolling = useRef(false);
+
+  // Initialize store and load queue
+  useEffect(() => {
+    const initStore = async () => {
+      try {
+        const s = await Store.load('upload-queue.json');
+        setStore(s);
+
+        const savedQueue = await s.get<UploadJob[]>(QUEUE_STORE_KEY);
+        console.log('Loaded queue from store:', savedQueue);
+        if (savedQueue) {
+          setQueue(savedQueue);
+        }
+      } catch (error) {
+        console.error('Failed to load upload queue:', error);
+      }
+    };
+
+    initStore();
+  }, []);
+
+  // Save queue whenever it changes
+  useEffect(() => {
+    if (store) {
+      const saveQueue = async () => {
+        await store.set(QUEUE_STORE_KEY, queue);
+        await store.save();
+        console.log('Saved queue to store:', queue.length, 'items');
+      };
+      saveQueue();
+    }
+  }, [queue, store]);
+
+  // Resume polling for indexing jobs when queue is loaded
+  useEffect(() => {
+    if (!hasResumedPolling.current && queue.length > 0) {
+      hasResumedPolling.current = true;
+      const indexingJobs = queue.filter((job) => job.status === 'indexing' && job.jobId);
+      indexingJobs.forEach((job) => {
+        if (job.jobId) {
+          pollJobStatus(job.jobId, job.id);
+        }
+      });
+    }
+  }, [queue]);
 
   const handleSelectFiles = async () => {
     try {
@@ -29,22 +80,20 @@ export function UploadPage() {
       });
 
       if (selected && Array.isArray(selected)) {
-        const files = await Promise.all(
-          selected.map(async (path) => {
-            const { readFile } = await import('@tauri-apps/plugin-fs');
-            const contents = await readFile(path);
-            const fileName = path.split('/').pop() || path.split('\\').pop() || 'unknown';
-            return new File([contents], fileName);
-          })
-        );
+        const newJobs: UploadJob[] = selected.map((path) => {
+          // Convert path to use underscores: /home/user/docs/a.txt -> home_user_docs_a.txt
+          const fileName = path
+            .replace(/^[/\\]/, '') // Remove leading slash
+            .replace(/[/\\]/g, '_'); // Replace all slashes with underscores
 
-        const newJobs: UploadJob[] = files.map((file) => ({
-          id: Math.random().toString(36).substring(7),
-          file,
-          fileName: file.name,
-          status: 'pending',
-          progress: 0,
-        }));
+          return {
+            id: Math.random().toString(36).substring(7),
+            filePath: path,
+            fileName,
+            status: 'pending',
+            progress: 0,
+          };
+        });
 
         setQueue((prev) => [...prev, ...newJobs]);
       }
@@ -95,7 +144,7 @@ export function UploadPage() {
         }
 
         // Continue polling
-        setTimeout(() => poll(), 1000);
+        setTimeout(() => poll(), 200);
       } catch (error) {
         setQueue((prev) =>
           prev.map((job) =>
@@ -128,7 +177,7 @@ export function UploadPage() {
 
       try {
         // Upload file
-        const response = await api.uploadFile(job.file);
+        const response = await api.uploadFile(job.filePath, job.fileName, updateMode);
         const jobId = response.data.job_id;
 
         // Update to indexing and start polling
@@ -165,7 +214,7 @@ export function UploadPage() {
   };
 
   const clearCompleted = () => {
-    setQueue((prev) => prev.filter((job) => job.status !== 'complete'));
+    setQueue((prev) => prev.filter((job) => job.status !== 'complete' && job.status !== 'error'));
   };
 
   const clearAll = () => {
@@ -238,7 +287,7 @@ export function UploadPage() {
         </div>
 
         {/* Actions */}
-        <div className="flex gap-2 mb-6">
+        <div className="flex gap-2 mb-4">
           <button
             onClick={handleSelectFiles}
             className="px-4 py-2 bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 rounded-lg text-sm font-medium hover:bg-neutral-800 dark:hover:bg-neutral-100 transition-all"
@@ -250,10 +299,10 @@ export function UploadPage() {
             <>
               <button
                 onClick={clearCompleted}
-                disabled={!queue.some((job) => job.status === 'complete')}
+                disabled={!queue.some((job) => job.status === 'complete' || job.status === 'error')}
                 className="px-4 py-2 bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 rounded-lg text-sm font-medium hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Clear Completed
+                Clear Finished
               </button>
               <button
                 onClick={clearAll}
@@ -264,6 +313,16 @@ export function UploadPage() {
             </>
           )}
         </div>
+
+        <label className="flex items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300 cursor-pointer mb-6">
+          <input
+            type="checkbox"
+            checked={updateMode}
+            onChange={(e) => setUpdateMode(e.target.checked)}
+            className="w-4 h-4 rounded border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white"
+          />
+          Update file
+        </label>
 
         {/* Queue */}
         {queue.length === 0 ? (

@@ -8,7 +8,16 @@
     "opener:default",
     "dialog:default",
     "dialog:allow-open",
+    "dialog:allow-save",
     "fs:default",
-    "fs:allow-read-file"
+    "fs:allow-read-file",
+    "fs:allow-write-file",
+    "http:default",
+    "http:allow-fetch",
+    "store:default",
+    "store:allow-load",
+    "store:allow-save",
+    "store:allow-get",
+    "store:allow-set"
   ]
 }

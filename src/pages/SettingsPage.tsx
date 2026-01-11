@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useSettingsStore } from '../stores/settingsStore';
-import axios from 'axios';
+import { api } from '../lib/api';
 
 export function SettingsPage() {
   const {
@@ -13,7 +13,6 @@ export function SettingsPage() {
     setDownloadPath,
     setTheme,
     saveSettings,
-    loadSettings,
   } = useSettingsStore();
 
   const [showApiKey, setShowApiKey] = useState(false);
@@ -21,32 +20,12 @@ export function SettingsPage() {
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [saved, setSaved] = useState(false);
 
-  useEffect(() => {
-    loadSettings();
-  }, [loadSettings]);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-
-    root.classList.toggle('no-transition', true);
-    if (isDark) {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
-    setTimeout(() => root.classList.toggle('no-transition', false), 50);
-  }, [theme]);
-
   const handleTestConnection = async () => {
     setTestingConnection(true);
     setConnectionStatus('idle');
 
     try {
-      const response = await axios.get(`${apiUrl}/health`, {
-        headers: { 'X-API-Key': apiKey },
-        timeout: 5000,
-      });
+      const response = await api.healthCheck();
 
       if (response.data?.status === 'healthy') {
         setConnectionStatus('success');
