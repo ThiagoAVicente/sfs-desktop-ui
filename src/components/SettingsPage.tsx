@@ -61,20 +61,18 @@ export function SettingsPage() {
   };
 
   const handleSelectDownloadPath = async () => {
-    if (window.__TAURI__) {
-      try {
-        const dialog = await import('@tauri-apps/plugin-dialog');
-        const selected = await dialog.open({
-          directory: true,
-          multiple: false,
-        });
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog');
+      const selected = await open({
+        directory: true,
+        multiple: false,
+      });
 
-        if (selected && typeof selected === 'string') {
-          setDownloadPath(selected);
-        }
-      } catch (e) {
-        console.error('Failed to open directory dialog:', e);
+      if (selected && typeof selected === 'string') {
+        setDownloadPath(selected);
       }
+    } catch (e) {
+      console.error('Failed to open directory dialog:', e);
     }
   };
 

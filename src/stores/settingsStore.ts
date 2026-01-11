@@ -22,12 +22,13 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     const { apiUrl, apiKey, downloadPath, theme } = get();
     const settings = { apiUrl, apiKey, downloadPath, theme };
 
-    if (window.__TAURI__) {
+    try {
       const { Store } = await import('@tauri-apps/plugin-store');
       const store = await Store.load('settings.json');
       await store.set('settings', settings);
       await store.save();
-    } else {
+    } catch (e) {
+      // Fallback to localStorage if Tauri store fails
       localStorage.setItem('sfs-settings', JSON.stringify(settings));
     }
   },
@@ -35,16 +36,13 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   loadSettings: async () => {
     let settings: Settings | null = null;
 
-    if (window.__TAURI__) {
-      try {
-        const { Store } = await import('@tauri-apps/plugin-store');
-        const store = await Store.load('settings.json');
-        const loaded = await store.get<Settings>('settings');
-        settings = loaded ?? null;
-      } catch (e) {
-        console.error('Failed to load settings from Tauri store:', e);
-      }
-    } else {
+    try {
+      const { Store } = await import('@tauri-apps/plugin-store');
+      const store = await Store.load('settings.json');
+      const loaded = await store.get<Settings>('settings');
+      settings = loaded ?? null;
+    } catch (e) {
+      // Fallback to localStorage
       const stored = localStorage.getItem('sfs-settings');
       if (stored) {
         settings = JSON.parse(stored);
