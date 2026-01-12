@@ -2,6 +2,7 @@
 
 Desktop UI for semantic file search using Tauri + React.
 
+Check [sfs-api](https://github.com/ThiagoAVicente/sfs-api)
 
 <img src="images/screenshot.png" alt="Screenshot">
 
