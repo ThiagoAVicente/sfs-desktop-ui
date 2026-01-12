@@ -1,4 +1,4 @@
-# SFS - Semantic File Search
+# Semantic File Search Desktop UI (sfs-desktop-ui)
 
 Desktop UI for semantic file search using Tauri + React.
 
