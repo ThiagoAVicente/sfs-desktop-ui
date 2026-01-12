@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { api } from '../lib/api';
 import { useSettingsStore } from '../stores/settingsStore';
 import { save } from '@tauri-apps/plugin-dialog';
@@ -17,12 +17,22 @@ interface SearchResult {
 
 export function SearchPage() {
   const [query, setQuery] = useState('');
-  const [limit, setLimit] = useState(5);
-  const [scoreThreshold, setScoreThreshold] = useState(0.5);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState('');
+
+  // Use store for search settings
+  const limit = useSettingsStore((state) => state.searchLimit);
+  const scoreThreshold = useSettingsStore((state) => state.searchScoreThreshold);
+  const setLimit = useSettingsStore((state) => state.setSearchLimit);
+  const setScoreThreshold = useSettingsStore((state) => state.setSearchScoreThreshold);
+  const saveSettings = useSettingsStore((state) => state.saveSettings);
   const downloadPath = useSettingsStore((state) => state.downloadPath);
+
+  // Save settings when limit or threshold changes
+  useEffect(() => {
+    saveSettings();
+  }, [limit, scoreThreshold]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();

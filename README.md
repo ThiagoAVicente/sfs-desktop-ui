@@ -1,7 +1,21 @@
-# Tauri + React + Typescript
+# SFS - Semantic File Search
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+Desktop UI for semantic file search using Tauri + React.
 
-## Recommended IDE Setup
 
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+<img src="images/screenshot.png" alt="Screenshot">
+
+## Install
+
+```bash
+./install.sh # this will build the app and install it as a standalone binary and application
+```
+
+Installs to `~/.local/bin` and creates desktop entry.
+
+## Dependencies
+
+**Build:**
+- Node.js 18+
+- Cargo (Rust)
+- WebKitGTK

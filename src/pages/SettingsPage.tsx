@@ -1,24 +1,29 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSettingsStore } from '../stores/settingsStore';
 import { api } from '../lib/api';
 
 export function SettingsPage() {
-  const {
-    apiUrl,
-    apiKey,
-    downloadPath,
-    theme,
-    setApiUrl,
-    setApiKey,
-    setDownloadPath,
-    setTheme,
-    saveSettings,
-  } = useSettingsStore();
+  // Use shallow selector to ensure reactivity
+  const apiUrl = useSettingsStore((state) => state.apiUrl);
+  const apiKey = useSettingsStore((state) => state.apiKey);
+  const downloadPath = useSettingsStore((state) => state.downloadPath);
+  const theme = useSettingsStore((state) => state.theme);
+  const setApiUrl = useSettingsStore((state) => state.setApiUrl);
+  const setApiKey = useSettingsStore((state) => state.setApiKey);
+  const setDownloadPath = useSettingsStore((state) => state.setDownloadPath);
+  const setTheme = useSettingsStore((state) => state.setTheme);
+  const saveSettings = useSettingsStore((state) => state.saveSettings);
+  const loadSettings = useSettingsStore((state) => state.loadSettings);
 
   const [showApiKey, setShowApiKey] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [saved, setSaved] = useState(false);
+
+  // Load settings on mount
+  useEffect(() => {
+    loadSettings();
+  }, []);
 
   const handleTestConnection = async () => {
     setTestingConnection(true);

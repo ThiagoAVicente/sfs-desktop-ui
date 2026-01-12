@@ -1,11 +1,12 @@
 import { invoke } from '@tauri-apps/api/core';
+import { useSettingsStore } from '../stores/settingsStore';
 
 const getApiConfig = () => {
-  const stored = localStorage.getItem('sfs-settings');
-  const settings = stored ? JSON.parse(stored) : null;
+  // Use Zustand store instead of localStorage
+  const state = useSettingsStore.getState();
   return {
-    baseURL: settings?.apiUrl || 'https://localhost',
-    apiKey: settings?.apiKey || '',
+    baseURL: state.apiUrl || 'https://localhost',
+    apiKey: state.apiKey || '',
   };
 };
 

@@ -34,7 +34,7 @@ export function Layout() {
         </nav>
 
         <div className="p-4 border-t border-neutral-200 dark:border-neutral-800">
-          <NavLink to="/settings" className={navLinkClass}>
+          <NavLink to="/settings" className="block w-full px-4 py-2 text-sm font-medium rounded-md transition-colors text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:text-neutral-100 dark:hover:bg-neutral-800 [&.active]:bg-neutral-900 [&.active]:text-white dark:[&.active]:bg-white dark:[&.active]:text-neutral-900 text-center">
             Settings
           </NavLink>
         </div>

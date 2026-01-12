@@ -5,6 +5,8 @@ export interface Settings {
   apiKey: string;
   downloadPath: string;
   theme: Theme;
+  searchLimit: number;
+  searchScoreThreshold: number;
 }
 
 export const defaultSettings: Settings = {
@@ -12,4 +14,6 @@ export const defaultSettings: Settings = {
   apiKey: '',
   downloadPath: '',
   theme: 'system',
+  searchLimit: 5,
+  searchScoreThreshold: 0.5,
 };
