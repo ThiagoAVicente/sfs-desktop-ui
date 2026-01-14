@@ -4,7 +4,7 @@
 
 set -e
 
-APP_NAME="sfs"
+APP_NAME="sfs-desktop"
 SCRIPT_DIR="$(dirname "$(realpath "$0")")"
 BINARY="$SCRIPT_DIR/src-tauri/target/release/tauri-app"
 ICON="$SCRIPT_DIR/src-tauri/icons/128x128.png"
@@ -44,7 +44,7 @@ cp "$ICON" "$ICONS_DIR/$APP_NAME.png"
 
 # Create desktop entry
 echo -e "${GREEN}Creating desktop entry...${NC}"
-cat > "$APPS_DIR/$APP_NAME.desktop" <<EOF
+cat >"$APPS_DIR/$APP_NAME.desktop" <<EOF
 [Desktop Entry]
 Name=Semantic File Search
 Comment=Desktop UI for semantic file search
@@ -57,8 +57,8 @@ EOF
 
 # Update desktop database
 echo -e "${GREEN}Updating desktop database...${NC}"
-update-desktop-database "$APPS_DIR" &> /dev/null || true
-gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" &> /dev/null || true
+update-desktop-database "$APPS_DIR" &>/dev/null || true
+gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" &>/dev/null || true
 
 echo ""
 echo -e "${GREEN}Installation complete!${NC}"
