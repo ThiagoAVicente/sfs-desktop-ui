@@ -1,225 +1,14 @@
-import { useState, useEffect, useRef } from 'react';
-import { api } from '../lib/api';
-import { Store } from '@tauri-apps/plugin-store';
-
-type FileStatus = 'pending' | 'uploading' | 'indexing' | 'complete' | 'error';
-
-interface UploadJob {
-  id: string;
-  filePath: string;
-  fileName: string;
-  status: FileStatus;
-  jobId?: string;
-  error?: string;
-  progress: number;
-}
-
-const QUEUE_STORE_KEY = 'upload-queue';
+import { useUpload, type FileStatus } from '../hooks/useUpload';
 
 export function UploadPage() {
-  const [queue, setQueue] = useState<UploadJob[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [store, setStore] = useState<Store | null>(null);
-  const [updateMode, setUpdateMode] = useState(false);
-  const hasResumedPolling = useRef(false);
-
-  // Initialize store and load queue
-  useEffect(() => {
-    const initStore = async () => {
-      try {
-        const s = await Store.load('upload-queue.json');
-        setStore(s);
-
-        const savedQueue = await s.get<UploadJob[]>(QUEUE_STORE_KEY);
-        console.log('Loaded queue from store:', savedQueue);
-        if (savedQueue) {
-          setQueue(savedQueue);
-        }
-      } catch (error) {
-        console.error('Failed to load upload queue:', error);
-      }
-    };
-
-    initStore();
-  }, []);
-
-  // Save queue whenever it changes
-  useEffect(() => {
-    if (store) {
-      const saveQueue = async () => {
-        await store.set(QUEUE_STORE_KEY, queue);
-        await store.save();
-        console.log('Saved queue to store:', queue.length, 'items');
-      };
-      saveQueue();
-    }
-  }, [queue, store]);
-
-  // Resume polling for indexing jobs when queue is loaded
-  useEffect(() => {
-    if (!hasResumedPolling.current && queue.length > 0) {
-      hasResumedPolling.current = true;
-      const indexingJobs = queue.filter((job) => job.status === 'indexing' && job.jobId);
-      indexingJobs.forEach((job) => {
-        if (job.jobId) {
-          pollJobStatus(job.jobId, job.id);
-        }
-      });
-    }
-  }, [queue]);
-
-  const handleSelectFiles = async () => {
-    try {
-      const { open } = await import('@tauri-apps/plugin-dialog');
-      const selected = await open({
-        multiple: true,
-        filters: [{
-          name: 'Text Files',
-          extensions: ['txt', 'md', 'json', 'csv', 'log', 'xml', 'html', 'css', 'js', 'ts', 'tsx', 'jsx', 'py', 'java', 'c', 'cpp', 'h', 'rs', 'pdf']
-        }]
-      });
-
-      if (selected && Array.isArray(selected)) {
-        const newJobs: UploadJob[] = selected.map((path) => {
-          // Convert path to use underscores: /home/user/docs/a.txt -> home_user_docs_a.txt
-          const fileName = path
-            .replace(/^[/\\]/, '') // Remove leading slash
-            .replace(/[/\\]/g, '_'); // Replace all slashes with underscores
-
-          return {
-            id: Math.random().toString(36).substring(7),
-            filePath: path,
-            fileName,
-            status: 'pending',
-            progress: 0,
-          };
-        });
-
-        setQueue((prev) => [...prev, ...newJobs]);
-      }
-    } catch (e) {
-      console.error('Failed to select files:', e);
-    }
-  };
-
-  const pollJobStatus = async (jobId: string, uploadJobId: string) => {
-    const maxAttempts = 60; // 60 seconds max
-    let attempts = 0;
-
-    const poll = async (): Promise<void> => {
-      try {
-        const response = await api.getJobStatus(jobId);
-        const status = response.data.status;
-
-        if (status === 'complete') {
-          setQueue((prev) =>
-            prev.map((job) =>
-              job.id === uploadJobId
-                ? { ...job, status: 'complete', progress: 100 }
-                : job
-            )
-          );
-          return;
-        } else if (status === 'failed') {
-          setQueue((prev) =>
-            prev.map((job) =>
-              job.id === uploadJobId
-                ? { ...job, status: 'error', error: 'Indexing failed', progress: 0 }
-                : job
-            )
-          );
-          return;
-        }
-
-        attempts++;
-        if (attempts >= maxAttempts) {
-          setQueue((prev) =>
-            prev.map((job) =>
-              job.id === uploadJobId
-                ? { ...job, status: 'error', error: 'Timeout', progress: 0 }
-                : job
-            )
-          );
-          return;
-        }
-
-        // Continue polling
-        setTimeout(() => poll(), 200);
-      } catch (error) {
-        setQueue((prev) =>
-          prev.map((job) =>
-            job.id === uploadJobId
-              ? { ...job, status: 'error', error: 'Status check failed', progress: 0 }
-              : job
-          )
-        );
-      }
-    };
-
-    poll();
-  };
-
-  const processQueue = async () => {
-    if (isProcessing) return;
-
-    const pendingJobs = queue.filter((job) => job.status === 'pending');
-    if (pendingJobs.length === 0) return;
-
-    setIsProcessing(true);
-
-    for (const job of pendingJobs) {
-      // Update to uploading
-      setQueue((prev) =>
-        prev.map((j) =>
-          j.id === job.id ? { ...j, status: 'uploading', progress: 50 } : j
-        )
-      );
-
-      try {
-        // Upload file
-        const response = await api.uploadFile(job.filePath, job.fileName, updateMode);
-        const jobId = response.data.job_id;
-
-        // Update to indexing and start polling
-        setQueue((prev) =>
-          prev.map((j) =>
-            j.id === job.id
-              ? { ...j, status: 'indexing', jobId, progress: 75 }
-              : j
-          )
-        );
-
-        // Start polling for status
-        await pollJobStatus(jobId, job.id);
-
-        // Wait a bit before processing next file
-        await new Promise((resolve) => setTimeout(resolve, 500));
-      } catch (error: any) {
-        setQueue((prev) =>
-          prev.map((j) =>
-            j.id === job.id
-              ? {
-                  ...j,
-                  status: 'error',
-                  error: error.response?.data?.detail || error.message,
-                  progress: 0,
-                }
-              : j
-          )
-        );
-      }
-    }
-
-    setIsProcessing(false);
-  };
-
-  const clearCompleted = () => {
-    setQueue((prev) => prev.filter((job) => job.status !== 'complete' && job.status !== 'error'));
-  };
-
-  const clearAll = () => {
-    setQueue([]);
-  };
+  const {
+    queue,
+    updateMode,
+    setUpdateMode,
+    selectFiles,
+    clearCompleted,
+    clearAll,
+  } = useUpload();
 
   const getStatusColor = (status: FileStatus) => {
     switch (status) {
@@ -267,12 +56,6 @@ export function UploadPage() {
     }
   };
 
-  useEffect(() => {
-    if (!isProcessing && queue.some((job) => job.status === 'pending')) {
-      processQueue();
-    }
-  }, [queue, isProcessing]);
-
   return (
     <div className="min-h-full bg-neutral-50 dark:bg-neutral-950 p-8">
       <div className="max-w-4xl mx-auto">
@@ -289,7 +72,7 @@ export function UploadPage() {
         {/* Actions */}
         <div className="flex gap-2 mb-4">
           <button
-            onClick={handleSelectFiles}
+            onClick={selectFiles}
             className="px-4 py-2 bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 rounded-lg text-sm font-medium hover:bg-neutral-800 dark:hover:bg-neutral-100 transition-all"
           >
             Select Files

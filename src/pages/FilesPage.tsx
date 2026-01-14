@@ -1,29 +1,21 @@
 import { useState, useEffect } from 'react';
-import { api } from '../lib/api';
-import { save } from '@tauri-apps/plugin-dialog';
-import { writeFile } from '@tauri-apps/plugin-fs';
+import { useFiles } from '../hooks/useFiles';
 
 export function FilesPage() {
-  const [files, setFiles] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [deleting, setDeleting] = useState<string | null>(null);
-  const [downloading, setDownloading] = useState<string | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const {
+    files,
+    loading,
+    error,
+    deleting,
+    downloading,
+    loadFiles,
+    deleteFile,
+    downloadFile,
+    filterFiles,
+  } = useFiles();
 
-  const loadFiles = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const response = await api.listFiles();
-      setFiles(response.data.files || []);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load files');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [searchQuery, setSearchQuery] = useState('');
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
 
   useEffect(() => {
     loadFiles();
@@ -40,46 +32,23 @@ export function FilesPage() {
   const executeDelete = async () => {
     if (!pendingDelete) return;
 
-    setDeleting(pendingDelete);
     try {
-      await api.deleteFile(pendingDelete);
-      setFiles((prev) => prev.filter((f) => f !== pendingDelete));
+      await deleteFile(pendingDelete);
+      setPendingDelete(null);
     } catch (err: any) {
       alert(`Failed to delete: ${err.message}`);
-    } finally {
-      setDeleting(null);
-      setPendingDelete(null);
     }
   };
 
   const handleDownload = async (fileName: string) => {
-    setDownloading(fileName);
     try {
-      const response = await api.downloadFile(fileName);
-
-      const savePath = await save({
-        defaultPath: fileName,
-        filters: [{
-          name: 'All Files',
-          extensions: ['*']
-        }]
-      });
-
-      if (savePath) {
-        const arrayBuffer = await response.data.arrayBuffer();
-        const uint8Array = new Uint8Array(arrayBuffer);
-        await writeFile(savePath, uint8Array);
-      }
+      await downloadFile(fileName);
     } catch (err: any) {
       console.error('Download failed:', err);
-    } finally {
-      setDownloading(null);
     }
   };
 
-  const filteredFiles = files.filter((file) =>
-    file.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredFiles = filterFiles(searchQuery);
 
   return (
     <div className="min-h-full bg-neutral-50 dark:bg-neutral-950">
@@ -108,7 +77,7 @@ export function FilesPage() {
         {/* Refresh Button */}
         <div className="mb-6">
           <button
-            onClick={loadFiles}
+            onClick={() => loadFiles()}
             disabled={loading}
             className="px-4 py-2 bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 rounded-lg text-sm font-medium hover:bg-neutral-800 dark:hover:bg-neutral-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
