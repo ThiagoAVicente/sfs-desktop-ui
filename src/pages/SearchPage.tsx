@@ -1,25 +1,10 @@
 import { useState, useEffect } from 'react';
-import { api } from '../lib/api';
+import { useSearch } from '../hooks/useSearch';
 import { useSettingsStore } from '../stores/settingsStore';
-import { save } from '@tauri-apps/plugin-dialog';
-import { writeFile } from '@tauri-apps/plugin-fs';
-
-interface SearchResult {
-  score: number;
-  payload: {
-    file_path: string;
-    text: string;
-    start: number;
-    end: number;
-    chunk_index: number;
-  };
-}
 
 export function SearchPage() {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SearchResult[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [error, setError] = useState('');
+  const { results, searching, error, search, downloadFile } = useSearch();
 
   // Use store for search settings
   const limit = useSettingsStore((state) => state.searchLimit);
@@ -36,41 +21,12 @@ export function SearchPage() {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!query.trim()) return;
-
-    setSearching(true);
-    setError('');
-    setResults([]);
-
-    try {
-      const response = await api.search(query, limit, scoreThreshold);
-      setResults(response.data.results || []);
-    } catch (err: any) {
-      setError(err.message || 'Search failed');
-    } finally {
-      setSearching(false);
-    }
+    await search(query, limit, scoreThreshold);
   };
 
   const handleDownload = async (filePath: string) => {
     try {
-      const fileName = filePath.split('/').pop() || filePath.split('\\').pop() || 'download';
-      const response = await api.downloadFile(filePath);
-
-      // Ask user where to save
-      const savePath = await save({
-        defaultPath: downloadPath ? `${downloadPath}/${fileName}` : fileName,
-        filters: [{
-          name: 'All Files',
-          extensions: ['*']
-        }]
-      });
-
-      if (savePath) {
-        const arrayBuffer = await response.data.arrayBuffer();
-        const uint8Array = new Uint8Array(arrayBuffer);
-        await writeFile(savePath, uint8Array);
-      }
+      await downloadFile(filePath, downloadPath);
     } catch (err: any) {
       console.error('Download failed:', err);
     }
